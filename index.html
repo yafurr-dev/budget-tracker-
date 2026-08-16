@@ -338,10 +338,76 @@
     <div id="utilStatus" class="util-status-line"></div>
   </div>
 
+  <!-- GROCERIES -->
+  <div class="card">
+    <h2><span class="num">04</span> Groceries</h2>
+
+    <div class="row">
+      <input type="number" id="groceryBudgetInput" placeholder="e.g. 150" min="0" step="0.01">
+      <button class="btn-primary" id="saveGroceryBudgetBtn">Set groceries budget</button>
+    </div>
+    <div class="rent-zone" style="margin-top:14px; margin-bottom:20px;">
+      <div>
+        <div class="lbl">Groceries budget</div>
+        <div class="amt" id="groceryBudgetDisplay">0.00</div>
+      </div>
+      <div class="lbl">Locked · reserved from day one</div>
+    </div>
+
+    <div class="row">
+      <input type="text" id="groceryName" placeholder="What did you buy?" style="flex:2;">
+      <input type="number" id="groceryAmount" placeholder="Amount" min="0" step="0.01">
+      <input type="date" id="groceryDate">
+      <button class="btn-primary" id="addGroceryBtn">Add</button>
+    </div>
+    <div id="groceryList"></div>
+    <div class="subtotal-line"><span>Groceries bought</span><span id="groceryTotal">0.00</span></div>
+
+    <div class="row" style="margin-top:14px;">
+      <button class="btn-primary" id="finalizeGroceryBtn" style="flex:1;">Submit final result</button>
+      <button class="btn-ghost" id="editGroceryBtn" style="display:none; border:1px solid var(--paper-line); flex:1; text-align:center;">Edit</button>
+      <button class="btn-ghost" id="newCycleGroceryBtn" style="display:none; border:1px solid var(--paper-line); flex:1; text-align:center;">Start new month</button>
+    </div>
+    <div id="groceryStatus" class="util-status-line"></div>
+  </div>
+
+  <!-- SAVED UP -->
+  <div class="card">
+    <h2><span class="num">06</span> Saved up</h2>
+
+    <div class="rent-zone" style="background:linear-gradient(135deg, #E4EEE0, #F6F1E4); border-color:#8FAE86;">
+      <div>
+        <div class="lbl">Total saved up</div>
+        <div class="amt" id="savedUpDisplay">0.00</div>
+      </div>
+      <div class="lbl">Kept from grocery underspending · doesn't touch monthly spending</div>
+    </div>
+
+    <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--paper-line);">
+      <div class="util-meta" style="margin-bottom:8px; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em;">Distribute to this month</div>
+      <div class="row">
+        <input type="number" id="distributeAmount" placeholder="Amount to add to this month" min="0" step="0.01">
+        <button class="btn-primary" id="distributeBtn">Distribute</button>
+      </div>
+      <div id="distributedInfo"></div>
+    </div>
+
+    <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--paper-line);">
+      <div class="util-meta" style="margin-bottom:8px; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em;">Spend from saved up</div>
+      <div class="row">
+        <input type="text" id="savedUpExpName" placeholder="What for?" style="flex:2;">
+        <input type="number" id="savedUpExpAmount" placeholder="Amount" min="0" step="0.01">
+        <input type="date" id="savedUpExpDate">
+        <button class="btn-primary" id="addSavedUpExpBtn">Add expense</button>
+      </div>
+      <div id="savedUpExpList"></div>
+    </div>
+  </div>
+
 
   <!-- DAILY SPENDING -->
   <div class="card">
-    <h2><span class="num">04</span> Spending</h2>
+    <h2><span class="num">07</span> Spending</h2>
     <div class="row">
       <input type="number" id="spendAmount" placeholder="Amount spent" min="0" step="0.01">
       <input type="text" id="spendNote" placeholder="What for? (optional)" style="flex:2;">
@@ -365,13 +431,17 @@
 
 <script>
 const STORE_KEY = 'ledger-budget-data';
-let data = { income: 0, rent: 0, utilBudget: 0, utilFinalized: false, utilities: [], spendings: [] };
+let data = { income: 0, rent: 0, utilBudget: 0, utilFinalized: false, utilities: [], groceryBudget: 0, groceryFinalized: false, groceryLastDiff: 0, groceries: [], savedUp: 0, savedUpDistributed: 0, savedUpExpenses: [], spendings: [] };
 
 function fmt(n){
   return '€' + (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
 }
 function todayISO(){
-  return new Date().toISOString().slice(0,10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
 }
 function daysInMonth(d){
   return new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
@@ -386,6 +456,13 @@ async function load(){
       data.spendings = data.spendings || [];
       data.utilBudget = data.utilBudget || 0;
       data.utilFinalized = data.utilFinalized || false;
+      data.groceries = data.groceries || [];
+      data.groceryBudget = data.groceryBudget || 0;
+      data.groceryFinalized = data.groceryFinalized || false;
+      data.groceryLastDiff = data.groceryLastDiff || 0;
+      data.savedUp = data.savedUp || 0;
+      data.savedUpDistributed = data.savedUpDistributed || 0;
+      data.savedUpExpenses = data.savedUpExpenses || [];
     }
   }catch(e){ /* no existing data yet */ }
   render();
@@ -456,9 +533,108 @@ function render(){
   // Effective utility cost for the pool: set budget until bills are finalized, then the real total
   const utilTotal = data.utilFinalized ? billsTotal : Number(data.utilBudget||0);
 
+  // Groceries
+  document.getElementById('groceryBudgetInput').value = data.groceryBudget || '';
+  document.getElementById('groceryBudgetDisplay').textContent = fmt(data.groceryBudget || 0);
+
+  const groceriesTotal = data.groceries.reduce((s,g)=> s + Number(g.amount||0), 0);
+  document.getElementById('groceryTotal').textContent = fmt(groceriesTotal);
+
+  const groceryListEl = document.getElementById('groceryList');
+  groceryListEl.innerHTML = '';
+  if(data.groceries.length === 0){
+    groceryListEl.innerHTML = '<div class="empty">No groceries logged yet this cycle.</div>';
+  } else {
+    data.groceries.forEach(g => {
+      const div = document.createElement('div');
+      div.className = 'util-item';
+      div.innerHTML = `
+        <div class="util-left">
+          <div class="util-name">${escapeHtml(g.name)}</div>
+          <div class="util-meta">${g.date ? g.date : 'no date set'}</div>
+        </div>
+        <div class="util-right">
+          <span class="util-amt">${fmt(g.amount)}</span>
+          <button class="btn-ghost" data-id="${g.id}" data-action="delete-grocery">✕</button>
+        </div>
+      `;
+      groceryListEl.appendChild(div);
+    });
+  }
+
+  const groceryStatusEl = document.getElementById('groceryStatus');
+  const groceryDiff = Number(data.groceryBudget||0) - groceriesTotal;
+  if(!data.groceryFinalized){
+    groceryStatusEl.className = 'util-status-line even';
+    groceryStatusEl.textContent = data.groceries.length === 0
+      ? `Using your set budget of ${fmt(data.groceryBudget||0)} for daily balance.`
+      : `${data.groceries.length} item(s) logged, totaling ${fmt(groceriesTotal)} — still using your set budget of ${fmt(data.groceryBudget||0)} until you submit the final result.`;
+  } else if(groceryDiff > 0.001){
+    groceryStatusEl.className = 'util-status-line under';
+    groceryStatusEl.textContent = `Under budget by ${fmt(groceryDiff)} — moved to your saved up zone.`;
+  } else if(groceryDiff < -0.001){
+    groceryStatusEl.className = 'util-status-line over';
+    groceryStatusEl.textContent = `Over budget by ${fmt(Math.abs(groceryDiff))} — trimmed from your daily spend for the rest of the month.`;
+  } else {
+    groceryStatusEl.className = 'util-status-line even';
+    groceryStatusEl.textContent = `Right on budget.`;
+  }
+
+  document.getElementById('finalizeGroceryBtn').style.display = data.groceryFinalized ? 'none' : 'flex';
+  document.getElementById('editGroceryBtn').style.display = data.groceryFinalized ? 'flex' : 'none';
+  document.getElementById('newCycleGroceryBtn').style.display = data.groceryFinalized ? 'flex' : 'none';
+
+  // Saved up zone
+  document.getElementById('savedUpDisplay').textContent = fmt(data.savedUp || 0);
+
+  const distributedInfoEl = document.getElementById('distributedInfo');
+  if(Number(data.savedUpDistributed||0) > 0.001){
+    distributedInfoEl.innerHTML = `
+      <div class="util-status-line under" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <span>${fmt(data.savedUpDistributed)} added to this month's daily spending.</span>
+        <button class="btn-ghost" id="clearDistributeBtn" style="color:var(--ink-soft); white-space:nowrap;">Undo</button>
+      </div>
+    `;
+    document.getElementById('clearDistributeBtn').addEventListener('click', async ()=>{
+      data.savedUp = Number(data.savedUp||0) + Number(data.savedUpDistributed||0);
+      data.savedUpDistributed = 0;
+      await save(); render();
+    });
+  } else {
+    distributedInfoEl.innerHTML = '';
+  }
+
+  const savedUpExpListEl = document.getElementById('savedUpExpList');
+  savedUpExpListEl.innerHTML = '';
+  if(data.savedUpExpenses.length === 0){
+    savedUpExpListEl.innerHTML = '<div class="empty">Nothing spent from saved up yet.</div>';
+  } else {
+    data.savedUpExpenses.forEach(x => {
+      const div = document.createElement('div');
+      div.className = 'util-item';
+      div.innerHTML = `
+        <div class="util-left">
+          <div class="util-name">${escapeHtml(x.name)}</div>
+          <div class="util-meta">${x.date ? x.date : 'no date set'}</div>
+        </div>
+        <div class="util-right">
+          <span class="util-amt">${fmt(x.amount)}</span>
+          <button class="btn-ghost" data-id="${x.id}" data-action="delete-savedexp">✕</button>
+        </div>
+      `;
+      savedUpExpListEl.appendChild(div);
+    });
+  }
+
+  // Effective grocery cost for the pool: locked budget always, unless finalized AND overspent — then the real (higher) total
+  let groceryEffectiveCost = Number(data.groceryBudget||0);
+  if(data.groceryFinalized && groceriesTotal > Number(data.groceryBudget||0)){
+    groceryEffectiveCost = groceriesTotal;
+  }
+
   // Spendings — show this month only
   const now = new Date();
-  const monthKey = now.toISOString().slice(0,7);
+  const monthKey = todayISO().slice(0,7);
   const monthSpendings = data.spendings.filter(s => s.date.slice(0,7) === monthKey);
   const spentTotal = monthSpendings.reduce((s,x)=>s+Number(x.amount||0),0);
 
@@ -529,7 +705,7 @@ function render(){
 
 
   // Core calculation
-  const pool = Math.max(0, (Number(data.income)||0) - (Number(data.rent)||0) - utilTotal);
+  const pool = Math.max(0, (Number(data.income)||0) - (Number(data.rent)||0) - utilTotal - groceryEffectiveCost + Number(data.savedUpDistributed||0));
   const dim = daysInMonth(now);
   const dayOfMonth = now.getDate();
   const daysLeft = Math.max(1, dim - dayOfMonth + 1);
@@ -622,6 +798,101 @@ document.getElementById('finalizeUtilBtn').addEventListener('click', async ()=>{
 document.getElementById('editUtilBtn').addEventListener('click', async ()=>{
   data.utilFinalized = false;
   await save(); render();
+});
+
+document.getElementById('saveGroceryBudgetBtn').addEventListener('click', async ()=>{
+  const v = parseFloat(document.getElementById('groceryBudgetInput').value);
+  data.groceryBudget = isNaN(v) ? 0 : v;
+  await save(); render();
+});
+
+document.getElementById('addGroceryBtn').addEventListener('click', async ()=>{
+  const name = document.getElementById('groceryName').value.trim();
+  const amount = parseFloat(document.getElementById('groceryAmount').value);
+  const date = document.getElementById('groceryDate').value;
+  if(!name || isNaN(amount)) return;
+  data.groceries.push({ id: uid(), name, amount, date });
+  document.getElementById('groceryName').value = '';
+  document.getElementById('groceryAmount').value = '';
+  document.getElementById('groceryDate').value = '';
+  await save(); render();
+});
+
+document.getElementById('finalizeGroceryBtn').addEventListener('click', async ()=>{
+  const total = data.groceries.reduce((s,g)=>s+Number(g.amount||0),0);
+  const diff = Number(data.groceryBudget||0) - total;
+  if(diff > 0.001){
+    data.savedUp = Number(data.savedUp||0) + diff;
+    data.groceryLastDiff = diff;
+  } else {
+    data.groceryLastDiff = 0;
+  }
+  data.groceryFinalized = true;
+  await save(); render();
+});
+
+document.getElementById('editGroceryBtn').addEventListener('click', async ()=>{
+  if(data.groceryLastDiff > 0){
+    data.savedUp = Math.max(0, Number(data.savedUp||0) - data.groceryLastDiff);
+  }
+  data.groceryFinalized = false;
+  data.groceryLastDiff = 0;
+  await save(); render();
+});
+
+document.getElementById('newCycleGroceryBtn').addEventListener('click', async ()=>{
+  data.groceries = [];
+  data.groceryFinalized = false;
+  data.groceryLastDiff = 0;
+  await save(); render();
+});
+
+document.getElementById('groceryList').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  const id = btn.dataset.id;
+  if(btn.dataset.action === 'delete-grocery'){
+    data.groceries = data.groceries.filter(x=>x.id!==id);
+    await save(); render();
+  }
+});
+
+document.getElementById('distributeBtn').addEventListener('click', async ()=>{
+  const input = document.getElementById('distributeAmount');
+  let amount = parseFloat(input.value);
+  if(isNaN(amount) || amount <= 0) return;
+  const available = Number(data.savedUp||0);
+  if(amount > available) amount = available;
+  if(amount <= 0) return;
+  data.savedUp = available - amount;
+  data.savedUpDistributed = Number(data.savedUpDistributed||0) + amount;
+  input.value = '';
+  await save(); render();
+});
+
+document.getElementById('addSavedUpExpBtn').addEventListener('click', async ()=>{
+  const name = document.getElementById('savedUpExpName').value.trim();
+  const amount = parseFloat(document.getElementById('savedUpExpAmount').value);
+  const date = document.getElementById('savedUpExpDate').value || todayISO();
+  if(!name || isNaN(amount) || amount <= 0) return;
+  data.savedUp = Math.max(0, Number(data.savedUp||0) - amount);
+  data.savedUpExpenses.push({ id: uid(), name, amount, date });
+  document.getElementById('savedUpExpName').value = '';
+  document.getElementById('savedUpExpAmount').value = '';
+  document.getElementById('savedUpExpDate').value = '';
+  await save(); render();
+});
+
+document.getElementById('savedUpExpList').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  const id = btn.dataset.id;
+  if(btn.dataset.action === 'delete-savedexp'){
+    const item = data.savedUpExpenses.find(x=>x.id===id);
+    if(item){ data.savedUp = Number(data.savedUp||0) + Number(item.amount||0); }
+    data.savedUpExpenses = data.savedUpExpenses.filter(x=>x.id!==id);
+    await save(); render();
+  }
 });
 
 document.getElementById('addSpendBtn').addEventListener('click', async ()=>{
