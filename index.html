@@ -267,13 +267,18 @@
 
   <!-- HERO SUMMARY -->
   <div class="hero">
-    <div class="hero-label">Today's spending allowance</div>
+    <div class="hero-label">Left to spend today</div>
     <div class="hero-amount" id="heroAmount">—</div>
     <div class="hero-sub" id="heroSub">Set your income to begin</div>
     <div class="hero-grid">
-      <div><div class="k">To-spend pool</div><div class="v" id="poolTotal">0.00</div></div>
-      <div><div class="k">Spent so far</div><div class="v" id="spentTotal">0.00</div></div>
+      <div><div class="k">Today's allowance</div><div class="v" id="todayAllowance">0.00</div></div>
+      <div><div class="k">Spent today</div><div class="v" id="spentToday">0.00</div></div>
       <div><div class="k">Days left</div><div class="v" id="daysLeft">0</div></div>
+    </div>
+    <div class="hero-grid" style="margin-top:14px; padding-top:14px;">
+      <div><div class="k">To-spend pool</div><div class="v" id="poolTotal">0.00</div></div>
+      <div><div class="k">Spent this month</div><div class="v" id="spentTotal">0.00</div></div>
+      <div><div class="k">Baseline/day</div><div class="v" id="baselineDaily">0.00</div></div>
     </div>
   </div>
 
@@ -336,13 +341,23 @@
 
   <!-- DAILY SPENDING -->
   <div class="card">
-    <h2><span class="num">04</span> Today's spending</h2>
+    <h2><span class="num">04</span> Spending</h2>
     <div class="row">
       <input type="number" id="spendAmount" placeholder="Amount spent" min="0" step="0.01">
       <input type="text" id="spendNote" placeholder="What for? (optional)" style="flex:2;">
+      <input type="date" id="spendDate">
       <button class="btn-primary" id="addSpendBtn">Log it</button>
     </div>
     <div id="spendList"></div>
+
+    <div style="margin-top:22px; padding-top:18px; border-top:1px solid var(--paper-line);">
+      <div class="util-meta" style="margin-bottom:8px; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em;">Check a date</div>
+      <div class="row">
+        <input type="date" id="lookupDate" style="flex:1;">
+        <button class="btn-primary" id="clearLookupBtn" style="background:var(--ink-soft);">Clear</button>
+      </div>
+      <div id="lookupResult"></div>
+    </div>
   </div>
 
   <footer>Numbers are recalculated automatically as you add income, utilities, and spending.</footer>
@@ -449,16 +464,16 @@ function render(){
 
   const spendListEl = document.getElementById('spendList');
   spendListEl.innerHTML = '';
-  const recent = [...data.spendings].sort((a,b)=> b.date.localeCompare(a.date)).slice(0,10);
-  if(recent.length === 0){
-    spendListEl.innerHTML = '<div class="empty">No spending logged yet.</div>';
+  const today = todayISO();
+  const todaysItems = data.spendings.filter(s => s.date === today);
+  if(todaysItems.length === 0){
+    spendListEl.innerHTML = '<div class="empty">Nothing logged today yet.</div>';
   } else {
-    recent.forEach(s => {
+    todaysItems.forEach(s => {
       const div = document.createElement('div');
       div.className = 'spend-item';
       div.innerHTML = `
         <div>
-          <span class="spend-date">${s.date}</span>
           <span class="spend-note">${escapeHtml(s.note || 'spending')}</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
@@ -470,17 +485,69 @@ function render(){
     });
   }
 
+  // Default the "log it" date field to today, unless the user is mid-edit
+  const spendDateInput = document.getElementById('spendDate');
+  if(!spendDateInput.value) spendDateInput.value = todayISO();
+  spendDateInput.max = todayISO();
+
+  // Date lookup — show what was spent on a chosen date
+  const lookupInput = document.getElementById('lookupDate');
+  lookupInput.max = todayISO();
+  const lookupResultEl = document.getElementById('lookupResult');
+  const lookupVal = lookupInput.value;
+  if(!lookupVal){
+    lookupResultEl.innerHTML = '';
+  } else {
+    const dayItems = data.spendings.filter(s => s.date === lookupVal).sort((a,b)=> a.id.localeCompare(b.id));
+    const dayTotal = dayItems.reduce((s,x)=>s+Number(x.amount||0),0);
+    const niceDate = new Date(lookupVal + 'T00:00:00').toLocaleDateString(undefined, {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+    let itemsHtml = '';
+    if(dayItems.length === 0){
+      itemsHtml = '<div class="empty">Nothing logged on this date.</div>';
+    } else {
+      itemsHtml = dayItems.map(s => `
+        <div class="spend-item">
+          <div><span class="spend-note">${escapeHtml(s.note || 'spending')}</span></div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="util-amt">${fmt(s.amount)}</span>
+            <button class="btn-ghost" data-id="${s.id}" data-action="delete-spend">✕</button>
+          </div>
+        </div>
+      `).join('');
+    }
+    lookupResultEl.innerHTML = `
+      <div class="rent-zone" style="margin:10px 0;">
+        <div>
+          <div class="lbl">${niceDate}</div>
+          <div class="amt">${fmt(dayTotal)}</div>
+        </div>
+        <div class="lbl">total spent</div>
+      </div>
+      ${itemsHtml}
+    `;
+  }
+
+
   // Core calculation
   const pool = Math.max(0, (Number(data.income)||0) - (Number(data.rent)||0) - utilTotal);
   const dim = daysInMonth(now);
   const dayOfMonth = now.getDate();
   const daysLeft = Math.max(1, dim - dayOfMonth + 1);
-  const remaining = pool - spentTotal;
-  const suggestedDaily = remaining / daysLeft;
+
+  const spentBeforeToday = monthSpendings.filter(s => s.date !== today).reduce((s,x)=>s+Number(x.amount||0),0);
+  const spentToday = monthSpendings.filter(s => s.date === today).reduce((s,x)=>s+Number(x.amount||0),0);
+
+  const remainingBeforeToday = pool - spentBeforeToday;
+  const todaysAllowance = remainingBeforeToday / daysLeft;
+  const leftToday = todaysAllowance - spentToday;
+  const base = pool / dim;
 
   document.getElementById('poolTotal').textContent = fmt(pool);
   document.getElementById('spentTotal').textContent = fmt(spentTotal);
   document.getElementById('daysLeft').textContent = daysLeft;
+  document.getElementById('todayAllowance').textContent = fmt(todaysAllowance);
+  document.getElementById('spentToday').textContent = fmt(spentToday);
+  document.getElementById('baselineDaily').textContent = fmt(base);
 
   const heroAmountEl = document.getElementById('heroAmount');
   const heroSubEl = document.getElementById('heroSub');
@@ -488,21 +555,20 @@ function render(){
   if(!data.income){
     heroAmountEl.textContent = '—';
     heroAmountEl.classList.remove('deficit');
-    heroSubEl.textContent = 'Set your monthly income to see your daily budget';
+    heroSubEl.textContent = 'Set your monthly income to begin';
   } else {
-    heroAmountEl.textContent = (suggestedDaily < 0 ? '-' : '') + fmt(Math.abs(suggestedDaily));
-    if(suggestedDaily < 0){
+    heroAmountEl.textContent = (leftToday < 0 ? '-' : '') + fmt(Math.abs(leftToday));
+    if(leftToday < 0){
       heroAmountEl.classList.add('deficit');
-      heroSubEl.textContent = `You've overspent this month — your daily budget is running negative. Consider trimming spending.`;
+      heroSubEl.textContent = `You've gone ${fmt(Math.abs(leftToday))} over today's allowance of ${fmt(todaysAllowance)}.`;
     } else {
       heroAmountEl.classList.remove('deficit');
-      const base = pool / dim;
-      if(suggestedDaily > base){
-        heroSubEl.textContent = `You're under budget — you have more to spend today than your baseline of ${fmt(base)}/day.`;
-      } else if(suggestedDaily < base){
-        heroSubEl.textContent = `You're over budget — today's allowance is trimmed below your baseline of ${fmt(base)}/day.`;
+      if(todaysAllowance > base){
+        heroSubEl.textContent = `You're under budget — today's allowance is ${fmt(todaysAllowance)}, above your baseline of ${fmt(base)}/day.`;
+      } else if(todaysAllowance < base){
+        heroSubEl.textContent = `You're over budget — today's allowance is trimmed to ${fmt(todaysAllowance)}, below your baseline of ${fmt(base)}/day.`;
       } else {
-        heroSubEl.textContent = `Right on track with your baseline of ${fmt(base)}/day.`;
+        heroSubEl.textContent = `Right on track — today's allowance matches your baseline of ${fmt(base)}/day.`;
       }
     }
   }
@@ -561,11 +627,31 @@ document.getElementById('editUtilBtn').addEventListener('click', async ()=>{
 document.getElementById('addSpendBtn').addEventListener('click', async ()=>{
   const amount = parseFloat(document.getElementById('spendAmount').value);
   const note = document.getElementById('spendNote').value.trim();
+  const dateInput = document.getElementById('spendDate');
+  const date = dateInput.value || todayISO();
   if(isNaN(amount)) return;
-  data.spendings.push({ id: uid(), date: todayISO(), amount, note });
+  data.spendings.push({ id: uid(), date, amount, note });
   document.getElementById('spendAmount').value = '';
   document.getElementById('spendNote').value = '';
+  dateInput.value = todayISO();
   await save(); render();
+});
+
+document.getElementById('lookupDate').addEventListener('change', ()=>{ render(); });
+
+document.getElementById('clearLookupBtn').addEventListener('click', ()=>{
+  document.getElementById('lookupDate').value = '';
+  render();
+});
+
+document.getElementById('lookupResult').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  const id = btn.dataset.id;
+  if(btn.dataset.action === 'delete-spend'){
+    data.spendings = data.spendings.filter(x=>x.id!==id);
+    await save(); render();
+  }
 });
 
 document.getElementById('utilList').addEventListener('click', async (e)=>{
