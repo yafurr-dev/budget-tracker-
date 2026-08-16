@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="The Ledger">
+<meta name="theme-color" content="#1B3A2F">
+<title>The Ledger — Your Daily Budget</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
+  :root{
+    --paper: #F6F1E4;
+    --paper-line: #E3D9C0;
+    --ink: #1B3A2F;
+    --ink-soft: #4A5D52;
+    --brass: #A8791F;
+    --brass-light: #C99A3E;
+    --red: #A23B2E;
+    --card: #FFFDF7;
+    --shadow: rgba(27,58,47,0.12);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      repeating-linear-gradient(var(--paper) 0px, var(--paper) 27px, var(--paper-line) 28px),
+      var(--paper);
+    font-family:'Inter',sans-serif;
+    color:var(--ink);
+    min-height:100vh;
+    padding:32px 16px 80px;
+  }
+
+  .wrap{max-width:720px;margin:0 auto;}
+
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom:3px solid var(--ink);
+    padding-bottom:14px;
+    margin-bottom:28px;
+  }
+  header h1{
+    font-family:'Fraunces',serif;
+    font-weight:700;
+    font-size:2.1rem;
+    margin:0;
+    letter-spacing:-0.02em;
+  }
+  header .date{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:0.85rem;
+    color:var(--ink-soft);
+  }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--paper-line);
+    border-radius:6px;
+    box-shadow:0 2px 10px var(--shadow);
+    padding:22px 24px;
+    margin-bottom:20px;
+  }
+
+  .card h2{
+    font-family:'Fraunces',serif;
+    font-size:1.05rem;
+    font-weight:600;
+    margin:0 0 16px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .card h2 .num{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:0.75rem;
+    color:var(--brass);
+    border:1px solid var(--brass-light);
+    border-radius:3px;
+    padding:1px 6px;
+  }
+
+  /* Summary hero */
+  .hero{
+    background:var(--ink);
+    color:var(--paper);
+    border-radius:8px;
+    padding:26px 24px;
+    margin-bottom:24px;
+    position:relative;
+    overflow:hidden;
+  }
+  .hero::before{
+    content:"";
+    position:absolute; inset:0;
+    background:repeating-linear-gradient(transparent 0 27px, rgba(255,255,255,0.03) 27px 28px);
+    pointer-events:none;
+  }
+  .hero-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:0.72rem;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--brass-light);
+    margin-bottom:6px;
+  }
+  .hero-amount{
+    font-family:'Fraunces',serif;
+    font-weight:700;
+    font-size:3rem;
+    line-height:1;
+    letter-spacing:-0.02em;
+  }
+  .hero-amount.deficit{color:#E08872;}
+  .hero-sub{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:0.82rem;
+    color:#C9D6CE;
+    margin-top:10px;
+  }
+  .hero-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:14px;
+    margin-top:20px;
+    padding-top:18px;
+    border-top:1px solid rgba(255,255,255,0.15);
+  }
+  .hero-grid div{font-family:'IBM Plex Mono',monospace;}
+  .hero-grid .k{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;color:#9FB3A6;}
+  .hero-grid .v{font-size:1.15rem;font-weight:600;margin-top:3px;}
+
+  /* form rows */
+  .row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+  .row input, .row select{
+    font-family:'Inter',sans-serif;
+    font-size:0.92rem;
+    padding:9px 11px;
+    border:1px solid var(--paper-line);
+    border-radius:5px;
+    background:var(--paper);
+    color:var(--ink);
+    flex:1;
+    min-width:100px;
+  }
+  .row input:focus, .row select:focus{outline:2px solid var(--brass-light); outline-offset:1px;}
+  input[type=number]{font-family:'IBM Plex Mono',monospace;}
+
+  button{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:0.88rem;
+    padding:9px 16px;
+    border-radius:5px;
+    border:none;
+    cursor:pointer;
+    transition:transform 0.08s ease, opacity 0.15s ease;
+  }
+  button:active{transform:scale(0.97);}
+  .btn-primary{background:var(--ink); color:var(--paper);}
+  .btn-primary:hover{background:#274B3D;}
+  .btn-ghost{background:transparent; color:var(--red); border:1px solid transparent; padding:4px 8px; font-size:0.78rem;}
+  .btn-ghost:hover{background:rgba(162,59,46,0.08);}
+  .btn-mark{background:var(--brass); color:#fff; padding:5px 10px; font-size:0.75rem;}
+  .btn-mark.paid{background:var(--ink-soft);}
+
+  /* rent zone */
+  .rent-zone{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    background:linear-gradient(135deg, #EFE6CD, #F6F1E4);
+    border:1px dashed var(--brass-light);
+    border-radius:6px;
+    padding:14px 18px;
+  }
+  .rent-zone .amt{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:1.4rem;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .rent-zone .lbl{font-size:0.8rem; color:var(--ink-soft);}
+
+  /* utility list */
+  .util-item, .spend-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px 0;
+    border-bottom:1px solid var(--paper-line);
+    gap:10px;
+  }
+  .util-item:last-child, .spend-item:last-child{border-bottom:none;}
+  .util-name{font-weight:600; font-size:0.92rem;}
+  .util-meta{font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--ink-soft);}
+  .util-amt{font-family:'IBM Plex Mono',monospace; font-weight:600; min-width:80px; text-align:right;}
+  .util-left{flex:1; min-width:0;}
+  .util-right{display:flex; align-items:center; gap:10px;}
+  .util-status{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:0.7rem;
+    padding:2px 7px;
+    border-radius:10px;
+  }
+  .util-status.paid{background:#DDEBD8; color:#2C5F3F;}
+  .util-status.unpaid{background:#F3D9CE; color:var(--red);}
+
+  .empty{
+    font-family:'IBM Plex Mono',monospace;
+    color:var(--ink-soft);
+    font-size:0.85rem;
+    font-style:italic;
+    padding:8px 0;
+  }
+
+  .spend-note{font-size:0.85rem; color:var(--ink-soft);}
+  .spend-date{font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--brass); margin-right:8px;}
+
+  .subtotal-line{
+    display:flex; justify-content:space-between;
+    margin-top:12px; padding-top:12px;
+    border-top:1px solid var(--ink);
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:600;
+    font-size:0.9rem;
+  }
+
+  .util-status-line{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:0.85rem;
+    font-weight:600;
+    margin-top:10px;
+    padding:10px 14px;
+    border-radius:6px;
+  }
+  .util-status-line.under{background:#DDEBD8; color:#1F4A30;}
+  .util-status-line.over{background:#F3D9CE; color:var(--red);}
+  .util-status-line.even{background:var(--paper); color:var(--ink-soft);}
+
+  footer{
+    text-align:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:0.72rem;
+    color:var(--ink-soft);
+    margin-top:30px;
+  }
+
+  @media (max-width:480px){
+    .hero-amount{font-size:2.2rem;}
+    .hero-grid{grid-template-columns:1fr; gap:10px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>The Ledger</h1>
+    <div class="date" id="todayDate"></div>
+  </header>
+
+  <!-- HERO SUMMARY -->
+  <div class="hero">
+    <div class="hero-label">Today's spending allowance</div>
+    <div class="hero-amount" id="heroAmount">—</div>
+    <div class="hero-sub" id="heroSub">Set your income to begin</div>
+    <div class="hero-grid">
+      <div><div class="k">To-spend pool</div><div class="v" id="poolTotal">0.00</div></div>
+      <div><div class="k">Spent so far</div><div class="v" id="spentTotal">0.00</div></div>
+      <div><div class="k">Days left</div><div class="v" id="daysLeft">0</div></div>
+    </div>
+  </div>
+
+  <!-- INCOME -->
+  <div class="card">
+    <h2><span class="num">01</span> Monthly income</h2>
+    <div class="row">
+      <input type="number" id="incomeInput" placeholder="e.g. €2500" min="0" step="0.01">
+      <button class="btn-primary" id="saveIncomeBtn">Save income</button>
+    </div>
+  </div>
+
+  <!-- RENT ZONE -->
+  <div class="card">
+    <h2><span class="num">02</span> Rent zone <span style="font-weight:400;font-size:0.78rem;color:var(--ink-soft);">— fixed, same every month</span></h2>
+    <div class="row">
+      <input type="number" id="rentInput" placeholder="e.g. €800" min="0" step="0.01">
+      <button class="btn-primary" id="saveRentBtn">Set rent</button>
+    </div>
+    <div class="rent-zone" style="margin-top:14px;">
+      <div>
+        <div class="lbl">Reserved for rent</div>
+        <div class="amt" id="rentDisplay">0.00</div>
+      </div>
+      <div class="lbl">Locked · never touches your daily budget</div>
+    </div>
+  </div>
+
+  <!-- UTILITIES -->
+  <div class="card">
+    <h2><span class="num">03</span> Utilities</h2>
+
+    <div class="row">
+      <input type="number" id="utilBudgetInput" placeholder="e.g. 200" min="0" step="0.01">
+      <button class="btn-primary" id="saveUtilBudgetBtn">Set utilities budget</button>
+    </div>
+    <div class="rent-zone" style="margin-top:14px; margin-bottom:20px;">
+      <div>
+        <div class="lbl">Utilities budget</div>
+        <div class="amt" id="utilBudgetDisplay">0.00</div>
+      </div>
+      <div class="lbl">Locked · reserved from day one</div>
+    </div>
+
+    <div class="row">
+      <input type="text" id="utilName" placeholder="Bill name (electricity, water...)" style="flex:2;">
+      <input type="number" id="utilAmount" placeholder="Amount" min="0" step="0.01">
+      <input type="date" id="utilDate">
+      <button class="btn-primary" id="addUtilBtn">Add bill</button>
+    </div>
+    <div id="utilList"></div>
+    <div class="subtotal-line"><span>Bills entered</span><span id="utilTotal">0.00</span></div>
+    <div class="row" style="margin-top:14px;">
+      <button class="btn-primary" id="finalizeUtilBtn" style="flex:1;">Done adding bills — recalculate</button>
+      <button class="btn-ghost" id="editUtilBtn" style="display:none; border:1px solid var(--paper-line); flex:1; text-align:center;">Edit bills</button>
+    </div>
+    <div id="utilStatus" class="util-status-line"></div>
+  </div>
+
+
+  <!-- DAILY SPENDING -->
+  <div class="card">
+    <h2><span class="num">04</span> Today's spending</h2>
+    <div class="row">
+      <input type="number" id="spendAmount" placeholder="Amount spent" min="0" step="0.01">
+      <input type="text" id="spendNote" placeholder="What for? (optional)" style="flex:2;">
+      <button class="btn-primary" id="addSpendBtn">Log it</button>
+    </div>
+    <div id="spendList"></div>
+  </div>
+
+  <footer>Numbers are recalculated automatically as you add income, utilities, and spending.</footer>
+</div>
+
+<script>
+const STORE_KEY = 'ledger-budget-data';
+let data = { income: 0, rent: 0, utilBudget: 0, utilFinalized: false, utilities: [], spendings: [] };
+
+function fmt(n){
+  return '€' + (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
+}
+function todayISO(){
+  return new Date().toISOString().slice(0,10);
+}
+function daysInMonth(d){
+  return new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+}
+
+async function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){
+      data = JSON.parse(raw);
+      data.utilities = data.utilities || [];
+      data.spendings = data.spendings || [];
+      data.utilBudget = data.utilBudget || 0;
+      data.utilFinalized = data.utilFinalized || false;
+    }
+  }catch(e){ /* no existing data yet */ }
+  render();
+}
+
+async function save(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(data));
+  }catch(e){ console.error('Storage error', e); }
+}
+
+function render(){
+  document.getElementById('todayDate').textContent = new Date().toLocaleDateString(undefined, {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+  document.getElementById('incomeInput').value = data.income || '';
+  document.getElementById('rentInput').value = data.rent || '';
+  document.getElementById('rentDisplay').textContent = fmt(data.rent || 0);
+
+  // Utilities
+  document.getElementById('utilBudgetInput').value = data.utilBudget || '';
+  document.getElementById('utilBudgetDisplay').textContent = fmt(data.utilBudget || 0);
+
+  const billsTotal = data.utilities.reduce((s,u)=> s + Number(u.amount||0), 0);
+  document.getElementById('utilTotal').textContent = fmt(billsTotal);
+
+  const utilListEl = document.getElementById('utilList');
+  utilListEl.innerHTML = '';
+  if(data.utilities.length === 0){
+    utilListEl.innerHTML = '<div class="empty">No bills written in yet — daily balance is using your set budget.</div>';
+  } else {
+    data.utilities.forEach(u => {
+      const div = document.createElement('div');
+      div.className = 'util-item';
+      div.innerHTML = `
+        <div class="util-left">
+          <div class="util-name">${escapeHtml(u.name)}</div>
+          <div class="util-meta">${u.date ? 'paid ' + u.date : 'no date set'}</div>
+        </div>
+        <div class="util-right">
+          <span class="util-amt">${fmt(u.amount)}</span>
+          <button class="btn-ghost" data-id="${u.id}" data-action="delete-util">✕</button>
+        </div>
+      `;
+      utilListEl.appendChild(div);
+    });
+  }
+
+  const utilStatusEl = document.getElementById('utilStatus');
+  const utilDiff = Number(data.utilBudget||0) - billsTotal;
+  if(!data.utilFinalized){
+    utilStatusEl.className = 'util-status-line even';
+    utilStatusEl.textContent = data.utilities.length === 0
+      ? `Using your set budget of ${fmt(data.utilBudget||0)} for daily balance.`
+      : `${data.utilities.length} bill(s) entered so far, totaling ${fmt(billsTotal)} — still using your set budget of ${fmt(data.utilBudget||0)} until you click "Done adding bills".`;
+  } else if(utilDiff > 0.001){
+    utilStatusEl.className = 'util-status-line under';
+    utilStatusEl.textContent = `Underspend — ${fmt(utilDiff)} under budget, added to your balance for the rest of the month.`;
+  } else if(utilDiff < -0.001){
+    utilStatusEl.className = 'util-status-line over';
+    utilStatusEl.textContent = `Overspend — ${fmt(Math.abs(utilDiff))} over budget, trimmed from your balance for the rest of the month.`;
+  } else {
+    utilStatusEl.className = 'util-status-line even';
+    utilStatusEl.textContent = `Right on budget.`;
+  }
+
+  document.getElementById('finalizeUtilBtn').style.display = data.utilFinalized ? 'none' : 'flex';
+  document.getElementById('editUtilBtn').style.display = data.utilFinalized ? 'flex' : 'none';
+
+  // Effective utility cost for the pool: set budget until bills are finalized, then the real total
+  const utilTotal = data.utilFinalized ? billsTotal : Number(data.utilBudget||0);
+
+  // Spendings — show this month only
+  const now = new Date();
+  const monthKey = now.toISOString().slice(0,7);
+  const monthSpendings = data.spendings.filter(s => s.date.slice(0,7) === monthKey);
+  const spentTotal = monthSpendings.reduce((s,x)=>s+Number(x.amount||0),0);
+
+  const spendListEl = document.getElementById('spendList');
+  spendListEl.innerHTML = '';
+  const recent = [...data.spendings].sort((a,b)=> b.date.localeCompare(a.date)).slice(0,10);
+  if(recent.length === 0){
+    spendListEl.innerHTML = '<div class="empty">No spending logged yet.</div>';
+  } else {
+    recent.forEach(s => {
+      const div = document.createElement('div');
+      div.className = 'spend-item';
+      div.innerHTML = `
+        <div>
+          <span class="spend-date">${s.date}</span>
+          <span class="spend-note">${escapeHtml(s.note || 'spending')}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="util-amt">${fmt(s.amount)}</span>
+          <button class="btn-ghost" data-id="${s.id}" data-action="delete-spend">✕</button>
+        </div>
+      `;
+      spendListEl.appendChild(div);
+    });
+  }
+
+  // Core calculation
+  const pool = Math.max(0, (Number(data.income)||0) - (Number(data.rent)||0) - utilTotal);
+  const dim = daysInMonth(now);
+  const dayOfMonth = now.getDate();
+  const daysLeft = Math.max(1, dim - dayOfMonth + 1);
+  const remaining = pool - spentTotal;
+  const suggestedDaily = remaining / daysLeft;
+
+  document.getElementById('poolTotal').textContent = fmt(pool);
+  document.getElementById('spentTotal').textContent = fmt(spentTotal);
+  document.getElementById('daysLeft').textContent = daysLeft;
+
+  const heroAmountEl = document.getElementById('heroAmount');
+  const heroSubEl = document.getElementById('heroSub');
+
+  if(!data.income){
+    heroAmountEl.textContent = '—';
+    heroAmountEl.classList.remove('deficit');
+    heroSubEl.textContent = 'Set your monthly income to see your daily budget';
+  } else {
+    heroAmountEl.textContent = (suggestedDaily < 0 ? '-' : '') + fmt(Math.abs(suggestedDaily));
+    if(suggestedDaily < 0){
+      heroAmountEl.classList.add('deficit');
+      heroSubEl.textContent = `You've overspent this month — your daily budget is running negative. Consider trimming spending.`;
+    } else {
+      heroAmountEl.classList.remove('deficit');
+      const base = pool / dim;
+      if(suggestedDaily > base){
+        heroSubEl.textContent = `You're under budget — you have more to spend today than your baseline of ${fmt(base)}/day.`;
+      } else if(suggestedDaily < base){
+        heroSubEl.textContent = `You're over budget — today's allowance is trimmed below your baseline of ${fmt(base)}/day.`;
+      } else {
+        heroSubEl.textContent = `Right on track with your baseline of ${fmt(base)}/day.`;
+      }
+    }
+  }
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function uid(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+}
+
+document.getElementById('saveIncomeBtn').addEventListener('click', async ()=>{
+  const v = parseFloat(document.getElementById('incomeInput').value);
+  data.income = isNaN(v) ? 0 : v;
+  await save(); render();
+});
+
+document.getElementById('saveRentBtn').addEventListener('click', async ()=>{
+  const v = parseFloat(document.getElementById('rentInput').value);
+  data.rent = isNaN(v) ? 0 : v;
+  await save(); render();
+});
+
+document.getElementById('saveUtilBudgetBtn').addEventListener('click', async ()=>{
+  const v = parseFloat(document.getElementById('utilBudgetInput').value);
+  data.utilBudget = isNaN(v) ? 0 : v;
+  await save(); render();
+});
+
+document.getElementById('addUtilBtn').addEventListener('click', async ()=>{
+  const name = document.getElementById('utilName').value.trim();
+  const amount = parseFloat(document.getElementById('utilAmount').value);
+  const date = document.getElementById('utilDate').value;
+  if(!name || isNaN(amount)) return;
+  data.utilities.push({ id: uid(), name, amount, date });
+  document.getElementById('utilName').value = '';
+  document.getElementById('utilAmount').value = '';
+  document.getElementById('utilDate').value = '';
+  await save(); render();
+});
+
+document.getElementById('finalizeUtilBtn').addEventListener('click', async ()=>{
+  data.utilFinalized = true;
+  await save(); render();
+});
+
+document.getElementById('editUtilBtn').addEventListener('click', async ()=>{
+  data.utilFinalized = false;
+  await save(); render();
+});
+
+document.getElementById('addSpendBtn').addEventListener('click', async ()=>{
+  const amount = parseFloat(document.getElementById('spendAmount').value);
+  const note = document.getElementById('spendNote').value.trim();
+  if(isNaN(amount)) return;
+  data.spendings.push({ id: uid(), date: todayISO(), amount, note });
+  document.getElementById('spendAmount').value = '';
+  document.getElementById('spendNote').value = '';
+  await save(); render();
+});
+
+document.getElementById('utilList').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  const id = btn.dataset.id;
+  const action = btn.dataset.action;
+  if(action === 'delete-util'){
+    data.utilities = data.utilities.filter(x=>x.id!==id);
+    await save(); render();
+  }
+});
+
+document.getElementById('spendList').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  const id = btn.dataset.id;
+  if(btn.dataset.action === 'delete-spend'){
+    data.spendings = data.spendings.filter(x=>x.id!==id);
+    await save(); render();
+  }
+});
+
+load();
+</script>
+</body>
+</html>
